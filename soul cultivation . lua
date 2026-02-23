@@ -1,5 +1,5 @@
--- Soul Cultivation Farm v1.0 – Rayfield GUI Full + Multi Select + Super Fast Tween & Attack
--- Detect dari workspace.Enemies, pisah regular & boss, tween anti kepental, anti-kick agresif
+-- Soul Cultivation Farm v1.0 Full – Rayfield GUI + Multi Select + Super Fast Tween & Attack
+-- Detect semua mob dari workspace.Enemies, pisah regular & boss, tween anti kepental, attack tercepat, anti-kick
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
@@ -26,10 +26,10 @@ local noclipEnabled = false
 local attackCount = 0
 local lastAfkAction = tick()
 
-local tweenSpeed = 500          -- Super cepat untuk switch mob
+local tweenSpeed = 500          -- Super cepat untuk switch setelah kill
 local aboveDistance = 4         -- Jarak di atas mob
 local attackRange = 15
-local attackDelay = 0.01        -- Tercepat mungkin
+local attackDelay = 0.01        -- Tercepat mungkin (100 attack/detik)
 local refreshInterval = 0.2     -- Scan sangat cepat
 
 local selectedRegularMobs = {}  -- Multi select mob biasa
@@ -86,7 +86,7 @@ local function tweenToPosition(targetPos)
       tween.Completed:Wait()
    end)
    
-   -- Fallback langsung kalau tween gagal
+   -- Fallback langsung kalau tween gagal atau kepental
    pcall(function()
       hrp.CFrame = CFrame.new(targetPos)
    end)
@@ -219,7 +219,7 @@ local ToggleFarm = FarmTab:CreateToggle({
          startFarm()
          Rayfield:Notify({
             Title = "Farm Started",
-            Content = "Auto farm aktif – Tween super cepat",
+            Content = "Auto farm aktif – Tween super cepat & attack tercepat",
             Duration = 3
          })
       else
@@ -266,7 +266,7 @@ local RegularSection = MobTab:CreateSection("Pilih Mob Biasa")
 
 local RegularDropdown = MobTab:CreateDropdown({
    Name = "Multi Select Mob Biasa",
-   Options = {},  -- Diisi setelah refresh
+   Options = {},
    CurrentOption = {},
    MultipleOptions = true,
    Flag = "RegularMobs",
