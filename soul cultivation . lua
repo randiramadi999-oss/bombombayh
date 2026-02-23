@@ -1,585 +1,346 @@
-print("Script v13.3 mulai - Syntax clean 100%")
+-- Soul Cultivation Farm v1.0 – Rayfield GUI Full + Multi Select + Super Fast Tween & Attack
+-- Detect dari workspace.Enemies, pisah regular & boss, tween anti kepental, anti-kick agresif
 
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local player = Players.LocalPlayer
+local Window = Rayfield:CreateWindow({
+   Name = "Soul Cultivation Farm",
+   LoadingTitle = "Loading Farm Script...",
+   LoadingSubtitle = "by Grok",
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = "SoulCultivationFarm",
+      FileName = "Config"
+   },
+   KeySystem = false
+})
 
-print("Services loaded OK")
+local FarmTab = Window:CreateTab("Farm Controls", 4483362458)
+local MobTab = Window:CreateTab("Regular Mobs", 4483362458)
+local BossTab = Window:CreateTab("Boss Mobs", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
 
-local tweenSpeed = 400
-local aboveDistance = 4
-local verticalOffset = Vector3.new(0, aboveDistance, 0)
-local attackRange = 15
-local attackDelay = 0.05
-local refreshInterval = 0.5
-
+-- Variables
 local farming = false
 local noclipEnabled = false
-local originalY = nil
 local attackCount = 0
 local lastAfkAction = tick()
 
-local function findEnemyFolder()
-    local possibleFolders = {
-        "Enemies", "Mobs", "Enemy", "NPC", "Monsters", "Bosses", "EnemyFolder",
-        "CultivationMobs", "SpiritBeasts", "Demons", "SectEnemies", "Beasts", "Spirits"
-    }
-    for _, name in ipairs(possibleFolders) do
-        local folder = workspace:FindFirstChild(name)
-        if folder then
-            print("Folder musuh ditemukan: " .. name)
-            return folder
-        end
-    end
-    print("Tidak menemukan folder musuh standar - cek Workspace manual")
-    return nil
-end
+local tweenSpeed = 500          -- Super cepat untuk switch mob
+local aboveDistance = 4         -- Jarak di atas mob
+local attackRange = 15
+local attackDelay = 0.01        -- Tercepat mungkin
+local refreshInterval = 0.2     -- Scan sangat cepat
 
-local enemyFolder = findEnemyFolder()
-local validEnemies = {}
-local selectedTargets = {}
+local selectedRegularMobs = {}  -- Multi select mob biasa
+local selectedZangshiRen = false
+local selectedZangshiBing = false
 
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+
+-- Remote Attack
 local RemoteAttack = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("Attack")
 
+-- Enemies folder
+local EnemiesFolder = workspace:WaitForChild("Enemies")
+
+-- Scan enemies
+local validEnemies = {}
 local function scanEnemies()
-    print("Scan musuh dimulai...")
-    validEnemies = {}
-    if not enemyFolder then
-        print("Folder musuh tidak ada!")
-        return false
-    end
-    local count = 0
-    for _, v in pairs(enemyFolder:GetDescendants()) do
-        if v:IsA("Model") and (v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("RootPart") or v:FindFirstChild("Torso") or v:FindFirstChild("PrimaryPart")) then
-            local humanoid = v:FindFirstChildWhichIsA("Humanoid")
-            local health = humanoid and humanoid.Health or v:FindFirstChild("Health") or v:FindFirstChild("HP") or v:FindFirstChild("HealthValue")
-            if health and (health.Value or 0) > 0 then
-                table.insert(validEnemies, v)
-                count = count + 1
-            end
-        end
-    end
-    print("Ditemukan " .. count .. " musuh valid")
-    return count > 0
+   validEnemies = {}
+   for _, v in pairs(EnemiesFolder:GetChildren()) do
+      if v:IsA("Model") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChildWhichIsA("Humanoid") and v.Humanoid.Health > 0 then
+         table.insert(validEnemies, v)
+      end
+   end
 end
 
+-- Get HRP
 local function getHRP()
-    local char = player.Character
-    if char then
-        return char:FindFirstChild("HumanoidRootPart")
-    end
-    return nil
+   local char = player.Character
+   if char then return char:FindFirstChild("HumanoidRootPart") end
 end
 
+-- Tween super cepat & stabil (anti kepental setelah kill)
 local function tweenToPosition(targetPos)
-    local hrp = getHRP()
-    if not hrp then return false end
-    
-    local distance = (hrp.Position - targetPos).Magnitude
-    if distance < 8 then return true end
-    
-    local time = distance / tweenSpeed
-    local tweenInfo = TweenInfo.new(math.max(time, 0.08), Enum.EasingStyle.Linear)
-    
-    local success = pcall(function()
-        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
-        tween:Play()
-        tween.Completed:Wait()
-    end)
-    
-    if not success then
-        pcall(function()
-            hrp.CFrame = CFrame.new(targetPos)
-        end)
-    end
-    
-    return success
+   local hrp = getHRP()
+   if not hrp then return end
+   
+   local distance = (hrp.Position - targetPos).Magnitude
+   if distance < 8 then return end
+   
+   local time = distance / tweenSpeed
+   local tweenInfo = TweenInfo.new(math.max(time, 0.06), Enum.EasingStyle.Linear)
+   
+   pcall(function()
+      local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
+      tween:Play()
+      tween.Completed:Wait()
+   end)
+   
+   -- Fallback langsung kalau tween gagal
+   pcall(function()
+      hrp.CFrame = CFrame.new(targetPos)
+   end)
 end
 
+-- Noclip
 local function setNoclip(state)
-    local char = player.Character
-    if char then
-        for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = not state
-            end
-        end
-    end
+   local char = player.Character
+   if char then
+      for _, part in pairs(char:GetDescendants()) do
+         if part:IsA("BasePart") then
+            part.CanCollide = not state
+         end
+      end
+   end
 end
 
-local function toggleNoclip()
-    noclipEnabled = not noclipEnabled
-    setNoclip(noclipEnabled)
-    print("Noclip sekarang: " .. (noclipEnabled and "ON" or "OFF"))
-end
-
-spawn(function()
-    while true do
-        RunService.Heartbeat:Wait()
-        if farming or noclipEnabled then
-            local hrp = getHRP()
-            if hrp then
-                if not originalY then originalY = hrp.Position.Y end
-                if hrp.Position.Y < originalY - 50 then
-                    hrp.CFrame = CFrame.new(hrp.Position.X, originalY + 10, hrp.Position.Z)
-                    hrp.AssemblyLinearVelocity = Vector3.new()
-                    hrp.AssemblyAngularVelocity = Vector3.new()
-                end
-            end
-        else
-            originalY = nil
-        end
-    end
-end)
-
-local function getNearestFromSelected()
-    local hrp = getHRP()
-    if not hrp then return nil end
-    
-    local nearest, minDist = nil, math.huge
-    for _, enemy in ipairs(validEnemies) do
-        local name = enemy.Name
-        if selectedTargets[name] then
-            local ehrp = enemy:FindFirstChild("HumanoidRootPart") or enemy:FindFirstChild("RootPart") or enemy:FindFirstChild("Torso") or enemy:FindFirstChild("PrimaryPart")
-            local hum = enemy:FindFirstChildWhichIsA("Humanoid")
-            local health = hum and hum.Health or enemy:FindFirstChild("Health") or enemy:FindFirstChild("HP") or enemy:FindFirstChild("HealthValue")
-            if ehrp and (health and (health.Value or 0) > 0) then
-                local dist = (hrp.Position - ehrp.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    nearest = enemy
-                end
-            end
-        end
-    end
-    return nearest
-end
-
-local function countSelected()
-    local count = 0
-    for _ in pairs(selectedTargets) do count = count + 1 end
-    return count
-end
-
+-- Anti-kick super agresif
 local function doAntiKickAction()
-    if not farming then return end
-    local hrp = getHRP()
-    if not hrp then return end
-    
-    local randomDir = Vector3.new(math.random(-1,1)*10, 0, math.random(-1,1)*10)
-    hrp.AssemblyLinearVelocity = randomDir
-    
-    pcall(function()
-        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        wait(0.05)
-        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    end)
-    
-    pcall(function()
-        VirtualUser:MoveMouseTo(Vector2.new(math.random(200, 1000), math.random(200, 800)))
-        wait(0.1)
-        VirtualUser:MoveMouseTo(Vector2.new(math.random(200, 1000), math.random(200, 800)))
-    end)
-    
-    local keys = {Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Space, Enum.KeyCode.LeftShift, Enum.KeyCode.LeftControl}
-    local randomKey = keys[math.random(1, #keys)]
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, randomKey, false, game)
-        wait(0.05)
-        VirtualInputManager:SendKeyEvent(false, randomKey, false, game)
-    end)
-    
-    print("Anti-Kick: Action dilakukan")
+   if not farming then return end
+   local hrp = getHRP()
+   if not hrp then return end
+   
+   hrp.AssemblyLinearVelocity = Vector3.new(math.random(-1,1)*12, 0, math.random(-1,1)*12)
+   
+   pcall(function()
+      VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+      wait(0.05)
+      VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+   end)
+   
+   pcall(function()
+      VirtualUser:MoveMouseTo(Vector2.new(math.random(200, 1000), math.random(200, 800)))
+      wait(0.1)
+      VirtualUser:MoveMouseTo(Vector2.new(math.random(200, 1000), math.random(200, 800)))
+   end)
+   
+   local keys = {Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D, Enum.KeyCode.Space, Enum.KeyCode.LeftShift}
+   local randomKey = keys[math.random(1, #keys)]
+   pcall(function()
+      VirtualInputManager:SendKeyEvent(true, randomKey, false, game)
+      wait(0.05)
+      VirtualInputManager:SendKeyEvent(false, randomKey, false, game)
+   end)
+   
+   print("Anti-Kick: Action dilakukan")
 end
 
+-- Farm logic utama
 local function startFarm()
-    if countSelected() == 0 then
-        print("Pilih musuh dulu!")
-        farming = false
-        return
-    end
-    if not RemoteAttack then
-        print("Remote Attack ga ketemu!")
-        farming = false
-        return
-    end
-    
-    farming = true
-    print("FARM ON – Atas Stabil | Boss Terpisah | Tween No Kepental")
-    attackCount = 0
-    
-    spawn(function()
-        local lastScan = tick()
-        while farming do
-            if tick() - lastScan > 0.5 then
-                scanEnemies()
-                lastScan = tick()
+   farming = true
+   attackCount = 0
+   
+   spawn(function()
+      local lastScan = tick()
+      while farming do
+         if tick() - lastScan > refreshInterval then
+            scanEnemies()
+            lastScan = tick()
+         end
+         
+         -- Anti-kick
+         if tick() - lastAfkAction > math.random(120, 180) then
+            doAntiKickAction()
+            lastAfkAction = tick()
+         end
+         
+         local target = nil
+         for _, enemy in ipairs(validEnemies) do
+            local name = enemy.Name
+            if selectedRegularMobs[name] or (name == "Zangshi Hou Ren" and selectedZangshiRen) or (name == "Zangshi Hou Bing" and selectedZangshiBing) then
+               local ehrp = enemy:FindFirstChild("HumanoidRootPart")
+               if ehrp and enemy:FindFirstChildWhichIsA("Humanoid").Health > 0 then
+                  target = enemy
+                  break
+               end
             end
-            
-            if tick() - lastAfkAction > math.random(120, 180) then
-                doAntiKickAction()
-                lastAfkAction = tick()
+         end
+         
+         if not target then
+            wait(0.1)
+            continue
+         end
+         
+         local ehrp = target:FindFirstChild("HumanoidRootPart")
+         local hrp = getHRP()
+         if not ehrp or not hrp then continue end
+         
+         -- Tween cepat ke posisi atas mob
+         local basePos = Vector3.new(ehrp.Position.X, ehrp.Position.Y + aboveDistance, ehrp.Position.Z)
+         local sideOffset = Vector3.new(math.random(-2,2)*1.5, 0, math.random(-2,2)*1.5)
+         local safePos = basePos + sideOffset
+         
+         tweenToPosition(safePos)
+         hrp.CFrame = CFrame.lookAt(safePos, ehrp.Position)
+         
+         -- Attack loop tercepat
+         local lastAttack = 0
+         while farming and target.Parent and target:FindFirstChildWhichIsA("Humanoid").Health > 0 do
+            local dist = (hrp.Position - ehrp.Position).Magnitude
+            if dist <= attackRange then
+               local now = tick()
+               if now - lastAttack >= attackDelay then
+                  pcall(function()
+                     local args = {
+                        [1] = "Light",
+                        [2] = {RootPart = ehrp}
+                     }
+                     RemoteAttack:FireServer(unpack(args))
+                  end)
+                  attackCount = attackCount + 1
+                  lastAttack = now
+               end
             end
-            
-            local target = getNearestFromSelected()
-            
-            if not target or not target.Parent or (target:FindFirstChildWhichIsA("Humanoid") and target.Humanoid.Health <= 0) then
-                RunService.Heartbeat:Wait()
-                continue
-            end
-            
-            local ehrp = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart") or target:FindFirstChild("Torso") or target:FindFirstChild("PrimaryPart")
-            if not ehrp then continue end
-            
-            local hrp = getHRP()
-            if not hrp then continue end
-            
-            local basePos = Vector3.new(ehrp.Position.X, ehrp.Position.Y + aboveDistance, ehrp.Position.Z)
-            local sideOffset = Vector3.new(math.random(-2,2)*1.5, 0, math.random(-2,2)*1.5)
-            local safePos = basePos + sideOffset
-            
-            if (hrp.Position - safePos).Magnitude > 8 then
-                tweenToPosition(safePos)
-            end
-            
-            local lastAttack = 0
-            while farming and target.Parent and (target:FindFirstChildWhichIsA("Humanoid") and target.Humanoid.Health > 0) do
-                hrp = getHRP()
-                ehrp = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart") or target:FindFirstChild("Torso") or target:FindFirstChild("PrimaryPart")
-                if not hrp or not ehrp then break end
-                
-                local currentSafePos = Vector3.new(ehrp.Position.X, ehrp.Position.Y + aboveDistance, ehrp.Position.Z) + sideOffset
-                hrp.CFrame = CFrame.lookAt(currentSafePos, ehrp.Position)
-                
-                local dist = (hrp.Position - ehrp.Position).Magnitude
-                if dist <= attackRange then
-                    local now = tick()
-                    if now - lastAttack >= attackDelay then
-                        pcall(function()
-                            local args = {
-                                [1] = "Light",
-                                [2] = {
-                                    RootPart = ehrp
-                                },
-                            }
-                            RemoteAttack:FireServer(unpack(args))
-                        end)
-                        attackCount = attackCount + 1
-                        lastAttack = now
-                    end
-                end
-                
-                RunService.Heartbeat:Wait()
-            end
-        end
-        
-        print("FARM OFF | Total serangan: " .. attackCount)
-        farming = false
-    end)
+            RunService.Heartbeat:Wait()
+         end
+      end
+   end)
 end
 
--- GUI fallback ke PlayerGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SoulFarmChainV13_2"
-ScreenGui.ResetOnSpawn = false
+-- UI Controls
+local MainSection = FarmTab:CreateSection("Farm Controls")
 
-local success = pcall(function()
-    ScreenGui.Parent = game:GetService("CoreGui")
-    print("GUI dipasang ke CoreGui berhasil")
-end)
+local ToggleFarm = FarmTab:CreateToggle({
+   Name = "Auto Farm",
+   CurrentValue = false,
+   Callback = function(Value)
+      farming = Value
+      if Value then
+         startFarm()
+         Rayfield:Notify({
+            Title = "Farm Started",
+            Content = "Auto farm aktif – Tween super cepat",
+            Duration = 3
+         })
+      else
+         Rayfield:Notify({
+            Title = "Farm Stopped",
+            Content = "Auto farm dimatikan",
+            Duration = 3
+         })
+      end
+   end
+})
 
-if not success then
-    ScreenGui.Parent = player:WaitForChild("PlayerGui")
-    print("Fallback ke PlayerGui karena CoreGui gagal")
-end
+local ToggleNoclip = FarmTab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Callback = function(Value)
+      noclipEnabled = Value
+      setNoclip(Value)
+   end
+})
 
-local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 360, 0, 580)
-Frame.Position = UDim2.new(0.5, -180, 0.5, -290)
-Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
-Frame.BorderSizePixel = 0
-Frame.Active = true
-Frame.Draggable = true
-Frame.Parent = ScreenGui
+local AttackSlider = FarmTab:CreateSlider({
+   Name = "Attack Delay (detik)",
+   Range = {0.005, 0.1},
+   Increment = 0.005,
+   CurrentValue = 0.01,
+   Callback = function(Value)
+      attackDelay = Value
+   end
+})
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 45)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-Title.Text = "Soul Farm v13.2 – Atas Stabil + Boss Terpisah"
-Title.TextColor3 = Color3.fromRGB(255, 220, 100)
-Title.Font = Enum.Font.SourceSansBold
-Title.TextSize = 24
-Title.Parent = Frame
+local TweenSlider = FarmTab:CreateSlider({
+   Name = "Tween Speed",
+   Range = {300, 800},
+   Increment = 50,
+   CurrentValue = 500,
+   Callback = function(Value)
+      tweenSpeed = Value
+   end
+})
 
-local RefreshButton = Instance.new("TextButton")
-RefreshButton.Size = UDim2.new(0.45, 0, 0, 40)
-RefreshButton.Position = UDim2.new(0.05, 0, 0.085, 0)
-RefreshButton.BackgroundColor3 = Color3.fromRGB(50, 140, 60)
-RefreshButton.Text = "Refresh"
-RefreshButton.TextColor3 = Color3.new(1, 1, 1)
-RefreshButton.Font = Enum.Font.SourceSansBold
-RefreshButton.TextSize = 16
-RefreshButton.Parent = Frame
+-- Regular Mobs Multi Select
+local RegularSection = MobTab:CreateSection("Pilih Mob Biasa")
 
-local CountLabel = Instance.new("TextLabel")
-CountLabel.Size = UDim2.new(0.45, 0, 0, 40)
-CountLabel.Position = UDim2.new(0.5, 0, 0.085, 0)
-CountLabel.BackgroundTransparency = 1
-CountLabel.Text = "Total: 0"
-CountLabel.TextColor3 = Color3.fromRGB(180, 255, 180)
-CountLabel.Font = Enum.Font.SourceSansBold
-CountLabel.TextSize = 16
-CountLabel.Parent = Frame
+local RegularDropdown = MobTab:CreateDropdown({
+   Name = "Multi Select Mob Biasa",
+   Options = {},  -- Diisi setelah refresh
+   CurrentOption = {},
+   MultipleOptions = true,
+   Flag = "RegularMobs",
+   Callback = function(Options)
+      selectedRegularMobs = {}
+      for _, opt in ipairs(Options) do
+         selectedRegularMobs[opt] = true
+      end
+   end
+})
 
-local SearchBox = Instance.new("TextBox")
-SearchBox.Size = UDim2.new(0.9, 0, 0, 40)
-SearchBox.Position = UDim2.new(0.05, 0, 0.16, 0)
-SearchBox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-SearchBox.PlaceholderText = "Cari nama musuh..."
-SearchBox.TextColor3 = Color3.new(1, 1, 1)
-SearchBox.Font = Enum.Font.SourceSans
-SearchBox.TextSize = 16
-SearchBox.Parent = Frame
+local RefreshMobs = MobTab:CreateButton({
+   Name = "Refresh List Mob",
+   Callback = function()
+      scanEnemies()
+      local options = {}
+      for _, enemy in ipairs(validEnemies) do
+         local name = enemy.Name
+         if name \~= "Zangshi Hou Ren" and name \~= "Zangshi Hou Bing" then
+            table.insert(options, name)
+         end
+      end
+      RegularDropdown:Refresh(options, true)
+      Rayfield:Notify({
+         Title = "List Mob Diperbarui",
+         Content = "Ditemukan " .. #options .. " mob biasa",
+         Duration = 4
+      })
+   end
+})
 
-local ScrollFrame = Instance.new("ScrollingFrame")
-ScrollFrame.Size = UDim2.new(0.9, 0, 0.22, 0)
-ScrollFrame.Position = UDim2.new(0.05, 0, 0.24, 0)
-ScrollFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-ScrollFrame.BorderSizePixel = 0
-ScrollFrame.ScrollBarThickness = 6
-ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScrollFrame.Parent = Frame
+-- Boss Mobs Toggle
+local BossSection = BossTab:CreateSection("Boss Khusus")
 
-local ListLayout = Instance.new("UIListLayout")
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Padding = UDim.new(0, 4)
-ListLayout.Parent = ScrollFrame
+local ToggleRen = BossTab:CreateToggle({
+   Name = "Farm Zangshi Hou Ren",
+   CurrentValue = false,
+   Callback = function(Value)
+      selectedZangshiRen = Value
+   end
+})
 
--- Boss terpisah
-local BossFrame = Instance.new("Frame")
-BossFrame.Size = UDim2.new(0.9, 0, 0.12, 0)
-BossFrame.Position = UDim2.new(0.05, 0, 0.48, 0)
-BossFrame.BackgroundTransparency = 1
-BossFrame.Parent = Frame
+local ToggleBing = BossTab:CreateToggle({
+   Name = "Farm Zangshi Hou Bing",
+   CurrentValue = false,
+   Callback = function(Value)
+      selectedZangshiBing = Value
+   end
+})
 
-local ZangshiRenButton = Instance.new("TextButton")
-ZangshiRenButton.Size = UDim2.new(0.48, 0, 1, 0)
-ZangshiRenButton.Position = UDim2.new(0, 0, 0, 0)
-ZangshiRenButton.BackgroundColor3 = selectedTargets["Zangshi Hou Ren"] and Color3.fromRGB(100,160,100) or Color3.fromRGB(55,55,65)
-ZangshiRenButton.Text = "Zangshi Hou Ren " .. (selectedTargets["Zangshi Hou Ren"] and "☑" or "☐")
-ZangshiRenButton.TextColor3 = Color3.new(1,1,1)
-ZangshiRenButton.Font = Enum.Font.SourceSansBold
-ZangshiRenButton.TextSize = 16
-ZangshiRenButton.Parent = BossFrame
-
-ZangshiRenButton.MouseButton1Click:Connect(function()
-    selectedTargets["Zangshi Hou Ren"] = not selectedTargets["Zangshi Hou Ren"]
-    ZangshiRenButton.BackgroundColor3 = selectedTargets["Zangshi Hou Ren"] and Color3.fromRGB(100,160,100) or Color3.fromRGB(55,55,65)
-    ZangshiRenButton.Text = "Zangshi Hou Ren " .. (selectedTargets["Zangshi Hou Ren"] and "☑" or "☐")
-    TargetLabel.Text = "Targets: " .. countSelected()
-end)
-
-local ZangshiBingButton = Instance.new("TextButton")
-ZangshiBingButton.Size = UDim2.new(0.48, 0, 1, 0)
-ZangshiBingButton.Position = UDim2.new(0.52, 0, 0, 0)
-ZangshiBingButton.BackgroundColor3 = selectedTargets["Zangshi Hou Bing"] and Color3.fromRGB(100,160,100) or Color3.fromRGB(55,55,65)
-ZangshiBingButton.Text = "Zangshi Hou Bing " .. (selectedTargets["Zangshi Hou Bing"] and "☑" or "☐")
-ZangshiBingButton.TextColor3 = Color3.new(1,1,1)
-ZangshiBingButton.Font = Enum.Font.SourceSansBold
-ZangshiBingButton.TextSize = 16
-ZangshiBingButton.Parent = BossFrame
-
-ZangshiBingButton.MouseButton1Click:Connect(function()
-    selectedTargets["Zangshi Hou Bing"] = not selectedTargets["Zangshi Hou Bing"]
-    ZangshiBingButton.BackgroundColor3 = selectedTargets["Zangshi Hou Bing"] and Color3.fromRGB(100,160,100) or Color3.fromRGB(55,55,65)
-    ZangshiBingButton.Text = "Zangshi Hou Bing " .. (selectedTargets["Zangshi Hou Bing"] and "☑" or "☐")
-    TargetLabel.Text = "Targets: " .. countSelected()
-end)
-
-local TargetLabel = Instance.new("TextLabel")
-TargetLabel.Size = UDim2.new(0.58, 0, 0, 40)
-TargetLabel.Position = UDim2.new(0.05, 0, 0.62, 0)
-TargetLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
-TargetLabel.Text = "Targets: 0"
-TargetLabel.TextColor3 = Color3.new(1, 1, 1)
-TargetLabel.Font = Enum.Font.SourceSansBold
-TargetLabel.TextSize = 18
-TargetLabel.Parent = Frame
-
-local AttackLabel = Instance.new("TextLabel")
-AttackLabel.Size = UDim2.new(0.3, 0, 0, 40)
-AttackLabel.Position = UDim2.new(0.64, 0, 0.62, 0)
-AttackLabel.BackgroundColor3 = Color3.fromRGB(65, 50, 100)
-AttackLabel.Text = "Attacks: 0"
-AttackLabel.TextColor3 = Color3.fromRGB(255, 200, 255)
-AttackLabel.Font = Enum.Font.SourceSansBold
-AttackLabel.TextSize = 16
-AttackLabel.Parent = Frame
-
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0.45, 0, 0, 55)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.72, 0)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(70, 150, 70)
-ToggleButton.Text = "FARM OFF (F)"
-ToggleButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.TextSize = 20
-ToggleButton.Parent = Frame
-
-local NoclipButton = Instance.new("TextButton")
-NoclipButton.Size = UDim2.new(0.45, 0, 0, 55)
-NoclipButton.Position = UDim2.new(0.5, 0, 0.72, 0)
-NoclipButton.BackgroundColor3 = Color3.fromRGB(110, 110, 170)
-NoclipButton.Text = "NOCLIP OFF (N)"
-NoclipButton.TextColor3 = Color3.new(1, 1, 1)
-NoclipButton.Font = Enum.Font.SourceSansBold
-NoclipButton.TextSize = 20
-NoclipButton.Parent = Frame
-
-local Status = Instance.new("TextLabel")
-Status.Size = UDim2.new(0.9, 0, 0, 40)
-Status.Position = UDim2.new(0.05, 0, 0.86, 0)
-Status.BackgroundTransparency = 1
-Status.Text = "Status: Ready – Tekan Refresh"
-Status.TextColor3 = Color3.fromRGB(200, 255, 200)
-Status.Font = Enum.Font.SourceSans
-Status.TextSize = 18
-Status.Parent = Frame
-
-local TestButton = Instance.new("TextButton")
-TestButton.Size = UDim2.new(0.9, 0, 0, 35)
-TestButton.Position = UDim2.new(0.05, 0, 0.95, 0)
-TestButton.BackgroundColor3 = Color3.fromRGB(150, 70, 70)
-TestButton.Text = "Test Attack Nearest"
-TestButton.TextColor3 = Color3.new(1, 1, 1)
-TestButton.Font = Enum.Font.SourceSansBold
-TestButton.TextSize = 16
-TestButton.Parent = Frame
-
--- GUI Logic
-local function matchesSearch(name)
-    return SearchBox.Text == "" or string.find(string.lower(name), string.lower(SearchBox.Text), 1, true)
-end
-
-local function updateList()
-    print("Update list GUI...")
-    for _, child in pairs(ScrollFrame:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    
-    local unique = {}
-    for _, e in ipairs(validEnemies) do
-        local name = e.Name
-        if name \~= "Zangshi Hou Ren" and name \~= "Zangshi Hou Bing" then
-            unique[name] = (unique[name] or 0) + 1
-        end
-    end
-    
-    local order = 0
-    for name, cnt in pairs(unique) do
-        if matchesSearch(name) then
-            order = order + 1
-            local btn = Instance.new("TextButton")
-            btn.Name = name
-            btn.Size = UDim2.new(1, 0, 0, 40)
-            local sel = selectedTargets[name] or false
-            btn.BackgroundColor3 = sel and Color3.fromRGB(100,160,100) or Color3.fromRGB(55,55,65)
-            btn.Text = (sel and "☑ " or "☐ ") .. name .. " (" .. cnt .. ")"
-            btn.TextColor3 = Color3.new(1,1,1)
-            btn.Font = Enum.Font.SourceSans
-            btn.TextSize = 16
-            btn.LayoutOrder = order
-            btn.Parent = ScrollFrame
-            
-            btn.MouseButton1Click:Connect(function()
-                selectedTargets[name] = not selectedTargets[name]
-                TargetLabel.Text = "Targets: " .. countSelected()
-                updateList()
-            end)
-        end
-    end
-    
-    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 20)
-    CountLabel.Text = "Total: " .. #validEnemies
-    print("List updated – jumlah musuh: " .. #validEnemies)
-end
-
-RefreshButton.MouseButton1Click:Connect(function()
-    scanEnemies()
-    updateList()
-end)
-
-SearchBox:GetPropertyChangedSignal("Text"):Connect(updateList)
-
-ToggleButton.MouseButton1Click:Connect(function()
-    farming = not farming
-    if farming then
-        startFarm()
-        ToggleButton.Text = "FARM ON (F)"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(170, 70, 70)
-        Status.Text = "Farming aktif – Tween Stabil"
-    else
-        ToggleButton.Text = "FARM OFF (F)"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(70, 150, 70)
-        Status.Text = "Idle"
-    end
-end)
-
-NoclipButton.MouseButton1Click:Connect(function()
-    toggleNoclip()
-    NoclipButton.Text = "NOCLIP " .. (noclipEnabled and "ON" or "OFF") .. " (N)"
-    NoclipButton.BackgroundColor3 = noclipEnabled and Color3.fromRGB(170, 100, 170) or Color3.fromRGB(110, 110, 170)
-end)
-
-TestButton.MouseButton1Click:Connect(function()
-    local target = getNearestFromSelected()
-    if not target then 
-        print("Tidak ada target!")
-        return 
-    end
-    local ehrp = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("RootPart")
-    if ehrp then
-        pcall(function()
-            local args = {
-                [1] = "Light",
-                [2] = {
-                    RootPart = ehrp
-                },
-            }
-            RemoteAttack:FireServer(unpack(args))
-        end)
-        print("Test attack ke: " .. target.Name)
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == farmToggleKey then
-        ToggleButton.MouseButton1Click:Fire()
-    elseif input.KeyCode == noclipToggleKey then
-        NoclipButton.MouseButton1Click:Fire()
-    end
-end)
+-- Stats
+local StatsSection = FarmTab:CreateSection("Stats")
+local AttackLabel = FarmTab:CreateLabel("Attacks: 0")
 
 spawn(function()
-    while true do
-        wait(refreshInterval)
-        scanEnemies()
-        if not farming then
-            updateList()
-        end
-        AttackLabel.Text = "Attacks: " .. attackCount
-    end
+   while true do
+      wait(1)
+      AttackLabel:Set("Attacks: " .. attackCount)
+   end
 end)
 
-updateList()
-print("GUI loaded – seharusnya muncul sekarang")
-print("Tekan Refresh di GUI untuk scan musuh")
-print("Kalau list tetap kosong: cek console untuk jumlah musuh ditemukan")
-print("Kalau masih error syntax: paste dari Notepad dulu, jangan langsung dari chat")
+-- Anti-AFK loop
+spawn(function()
+   while true do
+      if farming and tick() - lastAfkAction > math.random(120, 180) then
+         doAntiKickAction()
+         lastAfkAction = tick()
+      end
+      wait(60)
+   end
+end)
+
+Rayfield:Notify({
+   Title = "Soul Cultivation Farm Loaded",
+   Content = "Tekan 'Refresh List Mob' untuk scan, pilih mob/boss, lalu toggle Auto Farm",
+   Duration = 6
+})
